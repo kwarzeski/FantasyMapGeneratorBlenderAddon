@@ -13,6 +13,15 @@ from mathutils import Vector
 from bpy_extras.object_utils import AddObjectHelper, object_data_add
 import random
 
+from bpy.props import (StringProperty,
+                       PointerProperty,
+                       )
+                       
+from bpy.types import (Panel,
+                       PropertyGroup,
+                       Operator,
+                       )
+
 class BuildAzTerrainOperator(bpy.types.Operator):
     """Builds Terrain and Burgs into the scene"""
     bl_idname = "mesh.build_az_terrain"
@@ -20,7 +29,7 @@ class BuildAzTerrainOperator(bpy.types.Operator):
 
     def execute(self, context):
         # JSON file
-        file_name = "C:/Users/kolse/Downloads/Thouzon-Full.json"
+        file_name = context.scene.my_tool.path
 
         f = open(file_name, "r", encoding="utf8")
          
@@ -103,7 +112,7 @@ class BuildAzTerrainOperator(bpy.types.Operator):
 
         # For testing, just generate a few cells in the middle. Hope its not ocean :)
         demoCells = cells[1000:3000]
-        buildTerrain(demoCells)
+        buildTerrain(cells)
 
         # Set up culture specific models for burgs
         # Get the models for the cities. Assign a model to each culture
@@ -124,7 +133,7 @@ class BuildAzTerrainOperator(bpy.types.Operator):
             # The first city is empty, skip it and any other empty ones
             # For smaller scale testing, check if the cell that contains the city is in the range above
             for theCity in cityList:
-                if theCity and theCity['cell'] > 1000 and theCity['cell'] < 3000:
+                if theCity and theCity['cell'] > 0 and theCity['cell'] < 8000:
                     cellID = theCity['cell']
                     thisCell = data['pack']['cells'][cellID]
                     # get the height of the city from the originating cell
@@ -150,19 +159,32 @@ class BuildAzTerrainOperator(bpy.types.Operator):
         
         return {'FINISHED'}
 
+class MyProperties(PropertyGroup):
+    path: StringProperty(
+        name="",
+        description="Path to Directory",
+        default="",
+        maxlen=1024,
+        subtype='FILE_PATH')
+
 class SamplePanel(bpy.types.Panel):
     """ Displayy panel in 3D view"""
     bl_label = "Import Azgaar Fantasy Map"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
+    bl_category = "Create"
+    bl_context = "objectmode"
     bl_options = {'HEADER_LAYOUT_EXPAND'}
     
     def draw(self, context):
         layout = self.layout
         col = layout.column(align=True)
+        col.prop(context.scene.my_tool, "path", text="")
+        # col.prop(context.scene, "my_float")
         col.operator("mesh.build_az_terrain", icon="MESH_CUBE")
     
 classes = (
+        MyProperties,
         SamplePanel,
         BuildAzTerrainOperator
         )
@@ -171,10 +193,17 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    bpy.types.Scene.my_float = bpy.props.FloatProperty(
+        name='Height Multiplier',
+        default=0.25 
+    )
+    bpy.types.Scene.my_tool = PointerProperty(type=MyProperties)
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
+    del bpy.types.Scene.my_float
+    del bpy.types.Scene.my_tool
 
 if __name__ == "__main__":
     register()
