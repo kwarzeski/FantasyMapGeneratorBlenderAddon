@@ -38,7 +38,18 @@ def buildMaterials(biomesData):
 
 
 def buildTerrain(data, hScale):
+    # For testing, use a smaller subset of cells
     cellData = data['pack']['cells']
+    
+    # scaling info
+    distanceScale = float(data['settings']['distanceScale'])
+    distanceUnit = data['settings']['distanceUnit']
+    # Boundary info used to place and center the map
+    # Center the map on 0,0,0
+    # Flip the y axis
+    bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
+    mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
+    
     for thisCell in cellData:
         verticesCount = len(thisCell['v'])
         cellName = "cell" + str(thisCell['i'])
@@ -51,7 +62,7 @@ def buildTerrain(data, hScale):
         # Add each pair of vertices to the list of vetices.
         # Add the cell center into the vertex lists - all vertices will make triangles with neighbors and the center
         # the cell center has no ID
-        cellCenter = [thisCell['p'][0],thisCell['p'][1],(thisCell['h']*hScale)]
+        cellCenter = [thisCell['p'][0]- mapSize[0]/2,mapSize[1]/2 -thisCell['p'][1],(thisCell['h']*hScale)]
         polyVertices.append(cellCenter)
         vertList.append(-1)
         for n in range(0, verticesCount):
@@ -75,7 +86,7 @@ def buildTerrain(data, hScale):
                     polyFace = [(n+1), vertList.index(neighborVert),0]
                     polyFaces.append(polyFace)
             vertList.append(vertID)
-            vert = Vector((vertPosition[0], vertPosition[1], (vertHeight*hScale)))
+            vert = Vector((vertPosition[0]- mapSize[0]/2, mapSize[1]/2 -vertPosition[1], (vertHeight*hScale)))
             polyVertices.append(vert)
             
         # Build the mesh and add the object
@@ -92,10 +103,13 @@ def buildTerrain(data, hScale):
         bpy.context.object.data.materials.append(bpy.data.materials[biomeName])
         
 # Add burgs. 
-def buildBurgs(cityList, meshList, cultures, cells, hScale):
+def buildBurgs(data, meshList, hScale):
     # Create a burg collection to put the cities in
     # bpy.ops.object.select_all(action='DESELECT')
     # bpy.ops.collection.create(name="burgs")
+    cultures = data['pack']['cultures']
+    cells = data['pack']['cells']
+    cityList = data['pack']['burgs']
     
     # Set up culture specific models for burgs
     # Get the models for the cities. Assign a model to each culture
@@ -109,15 +123,26 @@ def buildBurgs(cityList, meshList, cultures, cells, hScale):
         # Hide the collection in viewport after using the meshes
         # bpy.context.scene.burg_icon_collection.hide_viewport = True
         
+    # scaling info
+    distanceScale = float(data['settings']['distanceScale'])
+    distanceUnit = data['settings']['distanceUnit']
+    # Boundary info used to place and center the map
+    # Center the map on 0,0,0
+    # Flip the y axis
+    # x - mapSize[0]/2
+    # mapSize[1]/2 - y
+    bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
+    mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
+    
     # The first city is empty, skip it and any other empty ones
     # For smaller scale testing, check if the cell that contains the city is in the range above
     for theCity in cityList:
-        if theCity and theCity['cell'] > 0:
+        if theCity:
             cellID = theCity['cell']
             thisCell = cells[cellID]
             # get the height of the city from the originating cell
             # Will need to switch to raytracing to get correct height
-            cityLoc = (theCity['x'], theCity['y'], thisCell['h']*hScale)
+            cityLoc = (theCity['x'] - mapSize[0]/2, mapSize[1]/2 - theCity['y'], thisCell['h']*hScale)
             # scale by population
             cityScale = theCity['population']/30+.5
             cityName = theCity['name']
@@ -140,37 +165,46 @@ class BuildAzTerrainOperator(bpy.types.Operator):
     bl_label = "Build Terrain"
 
     def execute(self, context):
-        # JSON file
+        # Load the JSON file
         file_name = context.scene.my_tool.path
-
         f = open(file_name, "r", encoding="utf8")
-         
-        # Reading from file
         data = json.loads(f.read())
         cells = data['pack']['cells']
-        # Closing file
         f.close()
 
+        # Scaling for distance and getting the size of the map
+        # Blender's default units are meters
         # scaling for height manually at the moment
         hScale = .25
+        
+        # ToDo: convert from miles to meters for Blender. Scale up using settings
+        distanceScale = float(data['settings']['distanceScale'])
+        distanceUnit = data['settings']['distanceUnit']
+        bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
+        mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
+        mapName = data['info']['mapName']
+        # ToDo: Scale and convert height. default is feet, but map has option for meters and fathoms.
+        # height = unitRatio * (cell['h'] - 18) ** float(data['settings']['heightExponent'])
+        data['settings']['heightExponent'], data['settings']['heightUnit']
         
         # Get the collection to pull the city meshes from. Do this BEFORE making anything. If user has the collection selected, it will build the objects into the city collection :(
         meshList = bpy.context.scene.burg_icon_collection.all_objects.keys()
         
-        # create a terrain collection to put everthing in
-        bpy.ops.collection.create(name  = "terrain")
-        bpy.context.scene.collection.children.link(bpy.data.collections["terrain"])
+        # create a collection to put everthing in
+        # bpy.ops.collection.create(name  = mapName)
+        # bpy.context.scene.collection.children.link(bpy.data.collections[mapName])
 
         buildMaterials(data['biomesData'])
 
         # For testing, just generate a few cells in the middle. Hope its not ocean :)
         buildTerrain(data, hScale)
                     
-        buildBurgs(data['pack']['burgs'], meshList, data['pack']['cultures'], data['pack']['cells'], hScale)
+        buildBurgs(data, meshList, hScale)
 
         # Add the Ocean at 20 * hScale
         oceanLevel = 20*hScale
         bpy.ops.mesh.primitive_plane_add(size=2000, enter_editmode=False, align='WORLD', location=(1000, 1000, oceanLevel), scale=(1, 1, 1))
+        bpy.context.object.data.materials.append(bpy.data.materials['Marine'])
         
         return {'FINISHED'}
 
