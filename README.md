@@ -11,22 +11,20 @@ Export the full JSON from the site.
 
 ## Using the Addon
 
-Currently, you need 14 mesh objects to represent the different cultures' cities. They are named 'house01', 'house02', 'house03', 'house04', 'house05', 'house06', 'house07', 'house08', 'house09', 'house10', 'house11', 'house12', 'house13', and 'house14'. The addon randomly selects from the list for each culture.
-
 When installed, a panel will appear under the 'Create' tab in Object mode.
+![Screenshot 2024-03-27 111046](https://github.com/kwarzeski/FantasyMapGeneratorBlenderAddon/assets/99751286/015d4285-b8b9-4859-a8cf-6f4bf3c1760b)
 
-![Screenshot 2024-03-25 103150](https://github.com/kwarzeski/FantasyMapGeneratorBlenderAddon/assets/99751286/7618ad35-72f7-4c75-b4bf-0d54514d512e)
+Select a collection with meshes to represent the burgs. Needs a minimum of one mesh object. Select the JSON file from Azgaar, then click the 'Build Terrain' button. 
 
-Select the JSON file, then click the 'Build Terrain' button. 
+All the cells will be created as seperate objects. Materials are created for each biome and assigned to the cells. The burg meshes will be randomly assigned to each culture and will appear on each burg location, scaled for population.
 
-All the cells will be created as seperate objects. Materials are created for each biome and assigned to the cells. A house 'icon' will appear on each burg location, scaled for population.
-
-## To Do:
+## To Do & Known Bugs:
 - Maps are currently flipped on the y-axis
 - Match scaling from the generator
-- Check for duplicate vertices
+- Check for duplicate vertices when building the cells
 - Burg Flags to indicate state allegiance
-  * Some way of indicating province allegiance 
+  * Some way of indicating province allegiance
+  * Set a secondary material on each burg mesh for province or state
 - Road implementation
 - River implementation
 - Lake implementation
