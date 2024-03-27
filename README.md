@@ -19,7 +19,6 @@ Select a collection with meshes to represent the burgs. Needs a minimum of one m
 All the cells will be created as seperate objects. Materials are created for each biome and assigned to the cells. The burg meshes will be randomly assigned to each culture and will appear on each burg location, scaled for population.
 
 ## To Do & Known Bugs:
-- Maps are currently flipped on the y-axis
 - Match scaling from the generator
 - Check for duplicate vertices when building the cells
 - Burg Flags to indicate state allegiance
