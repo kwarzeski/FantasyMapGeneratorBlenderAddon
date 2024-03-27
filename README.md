@@ -22,7 +22,11 @@ Select the JSON file, then click the 'Build Terrain' button.
 All the cells will be created as seperate objects. Materials are created for each biome and assigned to the cells. A house 'icon' will appear on each burg location, scaled for population.
 
 ## To Do:
-- Set up a better system for picking objects/shapes/meshes for the city icons
 - Maps are currently flipped on the y-axis
 - Match scaling from the generator
 - Check for duplicate vertices
+- Burg Flags to indicate state allegiance
+  * Some way of indicating province allegiance 
+- Road implementation
+- River implementation
+- Lake implementation
