@@ -38,7 +38,7 @@ def buildMaterials(biomesData):
 
 
 def buildTerrain(data, hScale):
-    cellData = data['pack']['cells'][1000:3000]
+    cellData = data['pack']['cells']
     for thisCell in cellData:
         verticesCount = len(thisCell['v'])
         cellName = "cell" + str(thisCell['i'])
@@ -112,7 +112,7 @@ def buildBurgs(cityList, meshList, cultures, cells, hScale):
     # The first city is empty, skip it and any other empty ones
     # For smaller scale testing, check if the cell that contains the city is in the range above
     for theCity in cityList:
-        if theCity and theCity['cell'] > 0 and theCity['cell'] < 8000:
+        if theCity and theCity['cell'] > 0:
             cellID = theCity['cell']
             thisCell = cells[cellID]
             # get the height of the city from the originating cell
