@@ -15,6 +15,7 @@ import random
 
 from bpy.props import (StringProperty,
                        PointerProperty,
+                       FloatProperty,
                        )
                        
 from bpy.types import (Panel,
@@ -36,19 +37,36 @@ def buildMaterials(biomesData):
         # setting the diffuse color to the material
         bpy.data.materials[biomeName].diffuse_color = tuple(diffColor)
 
+def coaBaseColor(coa):
+    coa_colors = {
+        "argent" : [250, 250, 250, 255],
+        "or" : [255, 224, 102, 255],
+        "gules" : [215, 55, 74, 255],
+        "azure" : [55, 124, 215, 255],
+        "sable" : [51, 51, 51, 255],
+        "purpure" : [82, 45, 91, 255],
+        "vert" : [38, 192, 97, 255],
+        "murrey" : [133, 24,91, 255],
+        "sanguine" : [182, 58, 58, 255],
+        "tenne" : [204, 127, 25, 255]   
+    }
+    normalized_colors = {k: [i / 255 for i in v] for (k, v) in coa_colors.items() }
+    tint = "argent"
+    if "-" in coa['t1']:
+        tint = coa['t1'].split("-")[1]
+    else:
+        tint = coa['t1']
+    return tuple(normalized_colors[tint])
 
-def buildTerrain(data, hScale):
+def buildTerrain(data, hScale, dscale):
     # For testing, use a smaller subset of cells
-    cellData = data['pack']['cells']
+    cellData = data['pack']['cells'][1000:3000]
     
-    # scaling info
-    distanceScale = float(data['settings']['distanceScale'])
-    distanceUnit = data['settings']['distanceUnit']
     # Boundary info used to place and center the map
     # Center the map on 0,0,0
     # Flip the y axis
     bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
-    mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
+    mapSize = [(bounds[3][0]+bounds[2][0])*dscale, (bounds[0][1]+bounds[1][1])*dscale]
     
     for thisCell in cellData:
         verticesCount = len(thisCell['v'])
@@ -62,7 +80,12 @@ def buildTerrain(data, hScale):
         # Add each pair of vertices to the list of vetices.
         # Add the cell center into the vertex lists - all vertices will make triangles with neighbors and the center
         # the cell center has no ID
-        cellCenter = [thisCell['p'][0]- mapSize[0]/2,mapSize[1]/2 -thisCell['p'][1],(thisCell['h']*hScale)]
+        # scale height
+        if thisCell['h'] >= 20:
+            vertHeight = ((thisCell['h'] - 18) ** hScale) * bpy.context.scene.heightScaling
+        else:
+            vertHeight = (((thisCell['h'] - 20) / max(thisCell['h'],1)) * 50) * bpy.context.scene.heightScaling
+        cellCenter = [thisCell['p'][0]*dscale- mapSize[0]/2,mapSize[1]/2 -thisCell['p'][1]*dscale,vertHeight]
         polyVertices.append(cellCenter)
         vertList.append(-1)
         for n in range(0, verticesCount):
@@ -77,6 +100,11 @@ def buildTerrain(data, hScale):
                 if neighborCell < len(data['pack']['cells']):
                     vertHeight = vertHeight + data['pack']['cells'][neighborCell]['h']
             vertHeight = vertHeight/len(vertex['c'])
+            # Scale height
+            if vertHeight >= 20:
+                vertHeight = ((vertHeight - 18) ** hScale) * bpy.context.scene.heightScaling
+            else:
+                vertHeight = (((vertHeight - 20) / max(vertHeight,1)) * 50) * bpy.context.scene.heightScaling
             # Check if connected vertices are in the list yet. build a face with any that are
             # Ignore -1 vertex id
             # Faces are vertex, neighbor, center
@@ -86,7 +114,7 @@ def buildTerrain(data, hScale):
                     polyFace = [(n+1), vertList.index(neighborVert),0]
                     polyFaces.append(polyFace)
             vertList.append(vertID)
-            vert = Vector((vertPosition[0]- mapSize[0]/2, mapSize[1]/2 -vertPosition[1], (vertHeight*hScale)))
+            vert = Vector((vertPosition[0]*dscale - mapSize[0]/2, mapSize[1]/2 -vertPosition[1]*dscale, vertHeight))
             polyVertices.append(vert)
             
         # Build the mesh and add the object
@@ -101,9 +129,9 @@ def buildTerrain(data, hScale):
         biomeID = thisCell['biome']
         biomeName = data['biomesData']['name'][biomeID]
         bpy.context.object.data.materials.append(bpy.data.materials[biomeName])
-        
+
 # Add burgs. 
-def buildBurgs(data, meshList, hScale):
+def buildBurgs(data, meshList, hScale, distanceScale):
     # Create a burg collection to put the cities in
     # bpy.ops.object.select_all(action='DESELECT')
     # bpy.ops.collection.create(name="burgs")
@@ -123,16 +151,13 @@ def buildBurgs(data, meshList, hScale):
         # Hide the collection in viewport after using the meshes
         # bpy.context.scene.burg_icon_collection.hide_viewport = True
         
-    # scaling info
-    distanceScale = float(data['settings']['distanceScale'])
-    distanceUnit = data['settings']['distanceUnit']
     # Boundary info used to place and center the map
     # Center the map on 0,0,0
     # Flip the y axis
     # x - mapSize[0]/2
     # mapSize[1]/2 - y
     bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
-    mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
+    mapSize = [(bounds[3][0]+bounds[2][0]) * distanceScale, (bounds[0][1]+bounds[1][1]) * distanceScale]
     
     # The first city is empty, skip it and any other empty ones
     # For smaller scale testing, check if the cell that contains the city is in the range above
@@ -142,9 +167,10 @@ def buildBurgs(data, meshList, hScale):
             thisCell = cells[cellID]
             # get the height of the city from the originating cell
             # Will need to switch to raytracing to get correct height
-            cityLoc = (theCity['x'] - mapSize[0]/2, mapSize[1]/2 - theCity['y'], thisCell['h']*hScale)
+            cityLoc = (theCity['x'] * distanceScale - mapSize[0]/2, mapSize[1]/2 - theCity['y'] * distanceScale, ((thisCell['h'] - 18) ** hScale) * bpy.context.scene.heightScaling)
+            
             # scale by population
-            cityScale = theCity['population']/30+.5
+            cityScale = theCity['population']*data['settings']['populationRate']/100 + 1
             cityName = theCity['name']
             cityCulture = theCity['culture']
             cityIcon = cultureMeshList[cityCulture]
@@ -175,17 +201,26 @@ class BuildAzTerrainOperator(bpy.types.Operator):
         # Scaling for distance and getting the size of the map
         # Blender's default units are meters
         # scaling for height manually at the moment
-        hScale = .25
+        hScale = float(data['settings']['heightExponent'])
         
         # ToDo: convert from miles to meters for Blender. Scale up using settings
+        # scaleUnit = 1609.34
         distanceScale = float(data['settings']['distanceScale'])
         distanceUnit = data['settings']['distanceUnit']
+        # convert distance to meters
+        if distanceUnit == 'mi':
+            distanceScale = distanceScale * 1609.34
+        elif distanceUnit == 'km':
+            distanceScale = distanceScale * 1000
+        else:
+            distanceScale = distanceScale * 1500
+        # Get the distScaling from the panel
+        distanceScale = distanceScale * bpy.context.scene.distScaling
         bounds = [data['grid']['boundary'][0],data['grid']['boundary'][1],data['grid']['boundary'][-2],data['grid']['boundary'][-1]]
         mapSize = [bounds[3][0]+bounds[2][0], bounds[0][1]+bounds[1][1]]
         mapName = data['info']['mapName']
-        # ToDo: Scale and convert height. default is feet, but map has option for meters and fathoms.
-        # height = unitRatio * (cell['h'] - 18) ** float(data['settings']['heightExponent'])
-        data['settings']['heightExponent'], data['settings']['heightUnit']
+        # ToDo: Scale and convert height. Height is in meters
+        # height = (cell['h'] - 18) ** float(data['settings']['heightExponent'])
         
         # Get the collection to pull the city meshes from. Do this BEFORE making anything. If user has the collection selected, it will build the objects into the city collection :(
         meshList = bpy.context.scene.burg_icon_collection.all_objects.keys()
@@ -197,20 +232,20 @@ class BuildAzTerrainOperator(bpy.types.Operator):
         buildMaterials(data['biomesData'])
 
         # For testing, just generate a few cells in the middle. Hope its not ocean :)
-        buildTerrain(data, hScale)
+        buildTerrain(data, hScale, distanceScale)
                     
-        buildBurgs(data, meshList, hScale)
+        buildBurgs(data, meshList, hScale, distanceScale)
 
         # Add the Ocean at 20 * hScale
-        oceanLevel = 20*hScale
-        bpy.ops.mesh.primitive_plane_add(size=2000, enter_editmode=False, align='WORLD', location=(1000, 1000, oceanLevel), scale=(1, 1, 1))
-        bpy.context.object.data.materials.append(bpy.data.materials['Marine'])
+        # oceanLevel = 18
+        # bpy.ops.mesh.primitive_plane_add(size=2000, enter_editmode=False, align='WORLD', location=(0, 0, 0), scale=(1, 1, 1))
+        # bpy.context.object.data.materials.append(bpy.data.materials['Marine'])
         
         return {'FINISHED'}
 
 class MyProperties(PropertyGroup):
     path: StringProperty(
-        name="",
+        name="File",
         description="Path to Directory",
         default="",
         maxlen=1024,
@@ -230,6 +265,8 @@ class SamplePanel(bpy.types.Panel):
         col = layout.column(align=True)
         col.prop(context.scene.my_tool, "path", text="")
         col.prop(context.scene, "burg_icon_collection")
+        col.prop(context.scene, "distScaling")
+        col.prop(context.scene, "heightScaling")
         col.operator("mesh.build_az_terrain", icon="MESH_CUBE")
     
 classes = (
@@ -237,24 +274,29 @@ classes = (
         SamplePanel,
         BuildAzTerrainOperator
         )
-    
+
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.my_float = bpy.props.FloatProperty(
-        name='Height Multiplier',
-        default=0.25 
-    )
     bpy.types.Scene.my_tool = PointerProperty(type=MyProperties)
     bpy.types.Scene.burg_icon_collection = PointerProperty(name="Burgs",type=bpy.types.Collection)
+    bpy.types.Scene.distScaling = bpy.props.FloatProperty(
+        name='distScaling',
+        default=1.0 
+    )
+    bpy.types.Scene.heightScaling = bpy.props.FloatProperty(
+        name='heightScaling',
+        default=1.0 
+    )
 
 def unregister():
     for cls in classes:
         bpy.utils.unregister_class(cls)
-    del bpy.types.Scene.my_float
     del bpy.types.Scene.my_tool
     del bpy.types.Scene.burg_icon_collection
+    del bpy.types.Scene.distScaling
+    del bpy.types.Scene.heightScaling
 
 if __name__ == "__main__":
     register()
